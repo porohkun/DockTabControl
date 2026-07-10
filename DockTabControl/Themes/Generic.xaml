@@ -21,6 +21,7 @@
                                   Background="Transparent"/>
 
                         <Border Grid.Row="1"
+                                x:Name="PART_ContentHost"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 Background="{TemplateBinding Background}">

@@ -15,8 +15,10 @@ using GongDragDrop = ModPlus.GongSolutions.Wpf.DragDrop.DragDrop;
 /// </summary>
 public class DockTabControl : TabControl, IDragSource, IDropTarget
 {
-    private InsertionAdorner? _adorner;
+    private InsertionAdorner? _insertionAdorner;
+    private ContentDropAdorner? _contentAdorner;
     private AdornerLayer? _adornerLayer;
+    private Border? _contentHost;
 
     static DockTabControl()
     {
@@ -31,6 +33,12 @@ public class DockTabControl : TabControl, IDragSource, IDropTarget
         GongDragDrop.SetIsDropTarget(this, true);
         GongDragDrop.SetDragHandler(this, this);
         GongDragDrop.SetDropHandler(this, this);
+    }
+
+    public override void OnApplyTemplate()
+    {
+        base.OnApplyTemplate();
+        _contentHost = GetTemplateChild("PART_ContentHost") as Border;
     }
 
     private static bool IsAfterMidpoint(IDropInfo dropInfo, TabItem targetTab)
@@ -91,9 +99,11 @@ public class DockTabControl : TabControl, IDragSource, IDropTarget
         return sawTabItem;
     }
 
-    // ------------------------------------------------------------------
-    // Логика перемещения
-    // ------------------------------------------------------------------
+    private static object GetItemForContainer(TabItem container, DockTabControl owner)
+    {
+        object item = owner.ItemContainerGenerator.ItemFromContainer(container);
+        return item == DependencyProperty.UnsetValue ? container : item;
+    }
 
     private void MoveTab(TabDragData payload, int targetIndex)
     {
@@ -181,27 +191,55 @@ public class DockTabControl : TabControl, IDragSource, IDropTarget
         if (_adornerLayer is null)
             return;
 
-        if (_adorner is null || !ReferenceEquals(_adorner.AdornedElement, targetTab))
+        RemoveContentAdorner();
+
+        if (_insertionAdorner is null
+            || !ReferenceEquals(_insertionAdorner.AdornedElement, targetTab))
         {
-            RemoveAdorner();
-            _adorner = new(targetTab);
-            _adornerLayer.Add(_adorner);
+            RemoveInsertionAdorner();
+            _insertionAdorner = new(targetTab);
+            _adornerLayer.Add(_insertionAdorner);
         }
 
-        _adorner.IsLeftSide = !IsAfterMidpoint(dropInfo, targetTab);
+        _insertionAdorner.IsLeftSide = !IsAfterMidpoint(dropInfo, targetTab);
     }
 
-    private void RemoveAdorner()
+    private void ShowContentAdorner()
     {
-        if (_adorner is not null && _adornerLayer is not null)
-            _adornerLayer.Remove(_adorner);
-        _adorner = null;
+        _adornerLayer ??= AdornerLayer.GetAdornerLayer(this);
+        if (_adornerLayer is null)
+            return;
+
+        RemoveInsertionAdorner();
+
+        UIElement host = _contentHost as UIElement ?? this;
+        if (_contentAdorner is null
+            || !ReferenceEquals(_contentAdorner.AdornedElement, host))
+        {
+            RemoveContentAdorner();
+            _contentAdorner = new(host);
+            _adornerLayer.Add(_contentAdorner);
+        }
     }
 
-    private object GetItemForContainer(TabItem container, DockTabControl owner)
+    private void RemoveInsertionAdorner()
     {
-        object item = owner.ItemContainerGenerator.ItemFromContainer(container);
-        return item == DependencyProperty.UnsetValue ? container : item;
+        if (_insertionAdorner is not null && _adornerLayer is not null)
+            _adornerLayer.Remove(_insertionAdorner);
+        _insertionAdorner = null;
+    }
+
+    private void RemoveContentAdorner()
+    {
+        if (_contentAdorner is not null && _adornerLayer is not null)
+            _adornerLayer.Remove(_contentAdorner);
+        _contentAdorner = null;
+    }
+
+    private void RemoveAdorners()
+    {
+        RemoveInsertionAdorner();
+        RemoveContentAdorner();
     }
 
     #region IDragSource
@@ -241,7 +279,7 @@ public class DockTabControl : TabControl, IDragSource, IDropTarget
     {
     }
 
-    void IDragSource.DragCancelled() => RemoveAdorner();
+    void IDragSource.DragCancelled() => RemoveAdorners();
 
     bool IDragSource.TryCatchOccurredException(Exception exception) => false;
 
@@ -263,25 +301,21 @@ public class DockTabControl : TabControl, IDragSource, IDropTarget
             return;
 
         dropInfo.Effects = DragDropEffects.Move;
+        dropInfo.DropTargetHintAdorner = null; // глушим стандартный хинт Gong в обоих случаях
 
         var targetTab = FindTabItem(dropInfo.VisualTargetItem);
         bool overHeader = targetTab is not null
                           || IsWithinHeader(dropInfo.VisualTargetItem);
 
         if (overHeader && targetTab is not null)
-        {
-            dropInfo.DropTargetHintAdorner = null;
             ShowInsertionAdorner(dropInfo, targetTab);
-        }
         else
-        {
-            RemoveAdorner();
-        }
+            ShowContentAdorner();
 
         dropInfo.NotHandled = false;
     }
 
-    void IDropTarget.DragLeave(IDropInfo dropInfo) => RemoveAdorner();
+    void IDropTarget.DragLeave(IDropInfo dropInfo) => RemoveAdorners();
 
     void IDropTarget.DropHint(IDropHintInfo dropHintInfo)
     {
@@ -289,7 +323,7 @@ public class DockTabControl : TabControl, IDragSource, IDropTarget
 
     void IDropTarget.Drop(IDropInfo dropInfo)
     {
-        RemoveAdorner();
+        RemoveAdorners();
 
         var payload = GetPayload(dropInfo);
         if (payload is null)
