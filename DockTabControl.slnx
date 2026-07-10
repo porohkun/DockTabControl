@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="DockTabControlDemo/DockTabControlDemo.csproj" Id="fc925746-0a23-4c37-abec-3b43c5c74c7c" />
+  <Project Path="DockTabControl/DockTabControl.csproj" Id="5e21af03-8279-4205-8cd0-993463a3dcc6" />
+</Solution>
