@@ -79,24 +79,22 @@ public class DockTabControl : TabControl, IDragSource, IDropTarget
     private static bool IsWithinHeader(DependencyObject? source)
     {
         var node = source;
-        bool sawTabItem = false;
         while (node is not null)
         {
-            if (node is ContentPresenter cp && cp.Name == "PART_SelectedContentHost")
-                return false; // это тело выбранной вкладки
+            // Дошли до тела выбранной вкладки — это точно не заголовок.
+            if (node is ContentPresenter { Name: "PART_SelectedContentHost" })
+                return false;
 
-            if (node is TabItem)
-            {
-                sawTabItem = true;
-                break;
-            }
+            // Дошли до панели-хоста заголовков — значит это заголовок.
+            if (node is Panel { IsItemsHost: true })
+                return true;
 
             node = node is Visual or Visual3D
                 ? VisualTreeHelper.GetParent(node)
                 : LogicalTreeHelper.GetParent(node);
         }
 
-        return sawTabItem;
+        return false;
     }
 
     private static object GetItemForContainer(TabItem container, DockTabControl owner)
