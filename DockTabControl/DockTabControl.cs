@@ -4,6 +4,7 @@ using System.Collections;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using ModPlus.GongSolutions.Wpf.DragDrop;
@@ -15,6 +16,14 @@ using GongDragDrop = ModPlus.GongSolutions.Wpf.DragDrop.DragDrop;
 /// </summary>
 public class DockTabControl : TabControl, IDragSource, IDropTarget
 {
+    /// <summary>Событие: пользователь взаимодействовал с этой панелью (клик внутри неё).</summary>
+    public static readonly RoutedEvent PanelActivatedEvent =
+        EventManager.RegisterRoutedEvent(
+            nameof(PanelActivated),
+            RoutingStrategy.Bubble,
+            typeof(RoutedEventHandler),
+            typeof(DockTabControl));
+
     private InsertionAdorner? _insertionAdorner;
     private ContentDropAdorner? _contentAdorner;
     private AdornerLayer? _adornerLayer;
@@ -35,10 +44,22 @@ public class DockTabControl : TabControl, IDragSource, IDropTarget
         GongDragDrop.SetDropHandler(this, this);
     }
 
+    public event RoutedEventHandler PanelActivated
+    {
+        add => AddHandler(PanelActivatedEvent, value);
+        remove => RemoveHandler(PanelActivatedEvent, value);
+    }
+
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
         _contentHost = GetTemplateChild("PART_ContentHost") as Border;
+    }
+
+    protected override void OnPreviewMouseDown(MouseButtonEventArgs e)
+    {
+        base.OnPreviewMouseDown(e);
+        RaiseEvent(new(PanelActivatedEvent, this));
     }
 
     private static bool IsAfterMidpoint(IDropInfo dropInfo, TabItem targetTab)
